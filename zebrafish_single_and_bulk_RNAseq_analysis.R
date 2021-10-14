@@ -320,3 +320,55 @@ png("zebrafish_day3_adult_cryoinjury_mtz_PCA_plot_all_genes_08182016.png",res=60
 p1
 dev.off()
 
+#Fig.2B
+####### 3D PCA of zebrafish samples########
+library(DESeq)
+zf2human<-read.table("zf2human_homologue_01112016_Ensembl.txt",header=T,sep=",")
+zf2human<-na.omit(zf2human)
+zf2human<-subset(zf2human,Homology.Type=="ortholog_one2one")
+zf2human<-subset(zf2human,Human.Ensembl.Gene.ID %in% recon204)
+
+load("zebrafish_count_mat_complete_NOV222016.RData")
+
+
+cds<-newCountDataSet(count_mat[,grep("our",labels)],factor(labels[grep("our",labels)]))
+cds<-estimateSizeFactors(cds)
+cds<-estimateDispersions(cds)
+rs<-rowSums(counts(cds,normalized=T))
+cds<-cds[rs>10,]
+
+vst_mat<-getVarianceStabilizedData(cds)
+vst_mat<-vst_mat[rownames(vst_mat) %in% zf2human$Ensembl.Gene.ID,]
+
+
+zf<- t(scale(t(vst_mat),scale=F,center=T))
+set.seed(10)
+pca<-prcomp(t(zf))
+sd<-pca$sdev
+loadings<-pca$rotation
+var<-sd^2
+var.percent<-var/sum(var)*100
+scores <- data.frame(sample.groups=labels[grep("our",labels)], pca$x[,1:3])
+
+
+colnames(scores)[2:4]<-c("PC1","PC2","PC3")
+
+min_axis<-min(scores[,2:4])
+max_axis<-max(scores[,2:4])
+library(grid)
+cbPalette<-c("azure4","black","blue","brown","cadetblue","chartreuse","cyan",
+             "darkorange","darkorchid","deeppink","gold","lightcoral","lightseagreen","magenta","red","lightsalmon","yellow","mediumorchid4","deepskyblue","mediumvioletred","olivedrab","cornsilk","lavender","navajowhite4")
+
+
+
+scores$sample.groups<-as.character(scores$sample.groups)
+color_map<-data.frame(id=unique(scores$sample.groups),color=cbPalette[c(2,3,15,8)])
+color_map$id<-as.character(color_map$id)
+ind<-match(scores$sample.groups,color_map$id)
+scores$color<-color_map$color[ind]
+library(scatterplot3d)
+pdf("PCA_3D_our_samples.pdf")
+s3d<-scatterplot3d(scores$PC1,scores$PC2,scores$PC3,xlab="PC1",ylab="PC2",zlab="PC3",pch=19,cex.symbols = 3,cex.axis = 1.2,cex.lab = 1.8,color=scores$color)
+par(xpd=TRUE)
+legend(s3d$xyz.convert(-50, -30, 37),color_map$id,col=as.character(color_map$color),pch=19,ncol=2,bty="n",cex=2)
+dev.off()
